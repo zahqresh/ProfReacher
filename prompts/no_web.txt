@@ -1,1 +1,1 @@
-NONE (do not claim to have read papers; confidence cannot be "high")
+No OpenAlex or LangSearch research context was available. Do not claim to have read or verified any papers; base the hook only on the professor information provided, and do not set confidence to "high".

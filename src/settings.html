@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f5f7">
+    <title>Settings · CSC Mailer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        color: #1d1d1f;
+        background: #f5f5f7;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --muted: #86868b;
+        --line: #e7e7e9;
+        --blue: #0071e3;
+        --green: #248a52;
+        --red: #d93025;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; }
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      .page { width: min(900px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 64px; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; }
+      .brand { display: flex; align-items: center; gap: 11px; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+      .brand-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; color: white; background: #1d1d1f; }
+      .nav-link { padding: 9px 13px; border: 1px solid var(--line); border-radius: 10px; color: #424245; background: #fff; font-size: 12px; font-weight: 600; text-decoration: none; }
+      .eyebrow { margin: 0 0 10px; color: var(--blue); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: clamp(35px, 5vw, 48px); line-height: 1.07; letter-spacing: -.05em; }
+      .subtitle { max-width: 650px; margin: 12px 0 28px; color: #6e6e73; font-size: 14px; line-height: 1.6; }
+      .banner { display: none; margin: 0 0 17px; padding: 13px 15px; border: 1px solid #d9eee1; border-radius: 12px; color: #236b3d; background: #f2faf4; font-size: 12px; line-height: 1.5; }
+      .banner.error { border-color: #f1d3d1; color: #a92b22; background: #fff7f6; }
+      .banner.visible { display: block; }
+      .section { margin-top: 16px; padding: 23px 24px 8px; border: 1px solid #e9e9eb; border-radius: 18px; background: white; box-shadow: 0 2px 8px #00000005; }
+      .section-heading { margin: 0 0 7px; font-size: 17px; letter-spacing: -.025em; }
+      .section-intro { margin: 0 0 20px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+      .field { margin: 0 0 19px; }
+      .field-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+      .field label, .field-title { color: #38383b; font-size: 12px; font-weight: 620; }
+      .help { position: relative; display: inline-grid; width: 16px; height: 16px; place-items: center; padding: 0; border: 1px solid #c9c9ce; border-radius: 50%; color: #737378; background: #fff; font-size: 10px; font-weight: 650; }
+      .help:hover::after, .help:focus-visible::after { position: absolute; z-index: 2; top: 23px; left: 0; width: min(280px, 75vw); padding: 10px 12px; border-radius: 9px; color: #fff; background: #242427; box-shadow: 0 4px 16px #0002; content: attr(data-help); font-size: 11px; font-weight: 400; line-height: 1.5; text-align: left; }
+      .input, select { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #d9d9de; border-radius: 9px; outline: none; color: #242427; background: white; font-size: 12px; }
+      .input:focus, select:focus { border-color: #7bb5f1; box-shadow: 0 0 0 3px #0071e31c; }
+      .field-note { margin: 6px 0 0; color: #99999f; font-size: 10px; line-height: 1.5; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 15px; }
+      .choice { display: flex; gap: 9px; align-items: flex-start; margin: 8px 0 13px; color: #48484b; font-size: 12px; line-height: 1.45; }
+      .choice input { margin: 1px 0 0; accent-color: var(--blue); }
+      .upload-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+      .upload-row input[type=file] { max-width: 100%; color: #707075; font-size: 11px; }
+      .button { min-height: 36px; padding: 0 12px; border: 0; border-radius: 9px; font-size: 11px; font-weight: 620; }
+      .button.secondary { color: #1d1d1f; background: #f0f0f2; }
+      .button.primary { min-height: 42px; padding: 0 17px; color: white; background: var(--blue); font-size: 12px; }
+      .button:disabled { cursor: wait; opacity: .5; }
+      .report { margin-top: 10px; color: #277342; font-size: 11px; line-height: 1.6; }
+      .report.invalid { color: var(--red); }
+      .secret-status { color: #6e6e73; font-size: 10px; font-weight: 400; }
+      .clear-secret { display: flex; align-items: center; gap: 6px; margin: 7px 0 0; color: #85858a; font-size: 10px; }
+      .clear-secret input { accent-color: var(--blue); }
+      .footer { position: sticky; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 19px; padding: 13px 15px; border: 1px solid #e9e9eb; border-radius: 14px; background: #ffffffed; box-shadow: 0 5px 20px #0000000b; backdrop-filter: blur(12px); }
+      .footer-note { color: #77777c; font-size: 10px; line-height: 1.45; }
+      @media (max-width: 620px) {
+        .page { width: min(100% - 24px, 520px); padding-top: 24px; }
+        .topbar { margin-bottom: 34px; }
+        .section { padding: 20px 17px 5px; }
+        .grid { grid-template-columns: 1fr; gap: 0; }
+        .footer { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">C</span> CSC Mailer</div>
+        <a class="nav-link" href="/">← Dashboard</a>
+      </header>
+
+      <p class="eyebrow">Local configuration</p>
+      <h1>Everything in one place.</h1>
+      <p class="subtitle">Set up your professor list, research services, sender account, and safety limits here. Settings are saved to this computer's ignored <code>.env</code> file; saved credentials are never sent back to the browser.</p>
+      <div class="banner" id="banner" role="status"></div>
+
+      <form id="settings-form">
+        <section class="section">
+          <h2 class="section-heading">Professor list</h2>
+          <p class="section-intro">Choose one source. The app requires an exact header row so it can reliably find each professor and skip rows already marked as applied.</p>
+
+          <div class="field">
+            <div class="field-heading"><span class="field-title">Source type</span><button class="help" type="button" data-help="Use a Google Sheets link shared as Anyone with the link can view, or upload a CSV file from your computer. Only one source is used at a time." aria-label="About the professor list source">?</button></div>
+            <label class="choice"><input type="radio" name="source-type" value="sheet"> Google Sheet link</label>
+            <label class="choice"><input type="radio" name="source-type" value="csv"> Local CSV file</label>
+          </div>
+
+          <div class="field" id="sheet-source">
+            <div class="field-heading"><label for="SHEET_CSV_URL">Google Sheets URL</label><button class="help" type="button" data-help="Paste the normal URL from your browser, for example https://docs.google.com/spreadsheets/d/… . In Google Sheets choose Share → General access → Anyone with the link → Viewer. The app downloads the selected sheet tab as CSV." aria-label="Where to get a Google Sheets link">?</button></div>
+            <input class="input" id="SHEET_CSV_URL" name="SHEET_CSV_URL" type="url" placeholder="https://docs.google.com/spreadsheets/d/…">
+            <p class="field-note">Use “Check sheet” to verify sharing access, the expected headers, and the number of usable records.</p>
+            <button class="button secondary" id="validate-sheet" type="button">Check sheet format</button>
+            <div class="report" id="sheet-report" aria-live="polite"></div>
+          </div>
+
+          <div class="field" id="csv-source">
+            <div class="field-heading"><label for="csv-file">Upload CSV</label><button class="help" type="button" data-help="The CSV is saved as professors.csv inside the project folder and is not uploaded to any service. Files must be under 4 MB and contain the required columns shown below." aria-label="About CSV upload">?</button></div>
+            <div class="upload-row"><input id="csv-file" type="file" accept=".csv,text/csv"><button class="button secondary" id="upload-csv" type="button">Check and add CSV</button></div>
+            <p class="field-note">Required exact column names: Name, University, Email, Profile Link, Research Interests, Applied. Applied=TRUE rows are excluded; missing name/email and duplicate emails are skipped.</p>
+            <p class="field-note"><a href="/professors-template.csv">Download a CSV template</a> to start with the required header format.</p>
+            <div class="report" id="csv-report" aria-live="polite"></div>
+            <input type="hidden" id="CSV_PATH" name="CSV_PATH">
+          </div>
+
+          <div class="field">
+            <div class="field-heading"><label for="CV_PATH">CV file</label><button class="help" type="button" data-help="A PDF copy of your CV is attached only in live email mode. Upload it here (up to 15 MB) or enter a path to an existing PDF. The file stays in the project folder on this computer." aria-label="About the CV file">?</button></div>
+            <div class="upload-row"><input id="cv-file" type="file" accept="application/pdf,.pdf"><button class="button secondary" id="upload-cv" type="button">Upload CV PDF</button></div>
+            <input class="input" id="CV_PATH" name="CV_PATH" placeholder="./uploaded-cv.pdf">
+            <p class="field-note">Live sending requires an existing CV file. Dry-run mode does not send attachments.</p>
+            <div class="report" id="cv-report" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-heading">AI writing and research</h2>
+          <p class="section-intro">OpenRouter creates the personalized hook. OpenAlex adds author-matched scholarly works and abstracts; LangSearch adds broader web evidence. Both research sources are optional and feed their results into the OpenRouter prompt.</p>
+          <div class="grid">
+            <div class="field">
+              <div class="field-heading"><label for="OPENROUTER_API_KEY">OpenRouter API key</label><button class="help" type="button" data-help="Required to generate hooks. Create an account at openrouter.ai, open Keys, and create a key. Usage may incur charges depending on the model. Leave blank to keep the saved key." aria-label="Where to get an OpenRouter API key">?</button><span class="secret-status" id="OPENROUTER_API_KEY-status"></span></div>
+              <input class="input secret-input" id="OPENROUTER_API_KEY" name="OPENROUTER_API_KEY" type="password" autocomplete="new-password" placeholder="Saved key stays hidden; enter a replacement">
+              <label class="clear-secret"><input type="checkbox" name="clear_OPENROUTER_API_KEY"> Remove saved key</label>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="OPENROUTER_MODEL">OpenRouter model</label><button class="help" type="button" data-help="Model identifier sent to OpenRouter, such as openrouter/free or an available provider/model ID from openrouter.ai/models. The free router chooses an available free model automatically. Free-model limits currently include 20 requests per minute and a daily allowance that depends on your account; this app checks the remaining daily allowance, spaces requests, honors Retry-After, and retries temporary failures. If your daily allowance is used up, wait for reset or choose another model." aria-label="About the OpenRouter model">?</button></div>
+              <input class="input" id="OPENROUTER_MODEL" name="OPENROUTER_MODEL" placeholder="openrouter/free">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="OPENROUTER_BASE_URL">OpenRouter API URL</label><button class="help" type="button" data-help="Advanced setting: OpenAI-compatible chat completions base URL. Leave the standard OpenRouter URL unless you intentionally use a compatible endpoint." aria-label="About the API URL">?</button></div>
+              <input class="input" id="OPENROUTER_BASE_URL" name="OPENROUTER_BASE_URL" type="url" placeholder="https://openrouter.ai/api/v1">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="USE_WEB_SEARCH">LangSearch web search</label><button class="help" type="button" data-help="When on, the app searches the web for the professor's work before asking the AI to draft the hook. This requires the optional LangSearch API key. Turn it off to disable LangSearch; OpenAlex remains controlled separately." aria-label="About LangSearch web search">?</button></div>
+              <select id="USE_WEB_SEARCH" name="USE_WEB_SEARCH"><option value="true">On — use LangSearch (API key)</option><option value="false">Off — disable LangSearch</option></select>
+              <p class="field-note">This setting controls LangSearch only. OpenAlex has its own switch and works without a key.</p>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="OPENALEX_ENABLED">OpenAlex scholarly research</label><button class="help" type="button" data-help="OpenAlex is a scholarly catalogue of authors, institutions, works, and abstracts. Create an account at openalex.org, then copy your free API key from openalex.org/settings/api. With the key saved and this enabled, the app searches by professor name, filters by the university, then retrieves up to five recent works with available abstracts. The key raises the API usage budget and lets you track usage. This app keeps the integration off unless a key is saved. Uncertain institution matches are not attributed to the professor." aria-label="About OpenAlex and where to get its API key">?</button></div>
+              <select id="OPENALEX_ENABLED" name="OPENALEX_ENABLED"><option value="false">Off — default until a key is saved</option><option value="true">On — use my saved API key</option></select>
+              <p class="field-note">Recommended when configured: OpenAlex results are passed to OpenRouter with LangSearch results, when LangSearch is also enabled.</p>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="OPENALEX_API_KEY">OpenAlex API key</label><button class="help" type="button" data-help="Get a free key from openalex.org/settings/api after creating an OpenAlex account. The key is stored locally in your ignored .env file and sent to api.openalex.org in the Authorization header. Leave blank to keep the saved key." aria-label="Where to get an OpenAlex API key">?</button><span class="secret-status" id="OPENALEX_API_KEY-status"></span></div>
+              <input class="input secret-input" id="OPENALEX_API_KEY" name="OPENALEX_API_KEY" type="password" autocomplete="new-password" placeholder="Saved key stays hidden; enter a replacement">
+              <label class="clear-secret"><input type="checkbox" name="clear_OPENALEX_API_KEY"> Remove saved key</label>
+              <p class="field-note">Create an OpenAlex account and manage the free API key at <a href="https://openalex.org/settings/api" target="_blank" rel="noreferrer">openalex.org/settings/api</a>. OpenAlex is off by default until a key is saved.</p>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="LANGSEARCH_API_KEY">LangSearch API key</label><button class="help" type="button" data-help="Optional additional web-search source. Sign up at langsearch.com and copy the API key from your account/API console. If missing, the app still uses OpenAlex when enabled. Leave blank to keep the saved key." aria-label="Where to get a LangSearch API key">?</button><span class="secret-status" id="LANGSEARCH_API_KEY-status"></span></div>
+              <input class="input secret-input" id="LANGSEARCH_API_KEY" name="LANGSEARCH_API_KEY" type="password" autocomplete="new-password" placeholder="Saved key stays hidden; enter a replacement">
+              <label class="clear-secret"><input type="checkbox" name="clear_LANGSEARCH_API_KEY"> Remove saved key</label>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SEARCH_COUNT">Search results</label><button class="help" type="button" data-help="How many web results to request per professor. The prompt uses up to four results; supported configuration range is 1–20." aria-label="About search result count">?</button></div>
+              <input class="input" id="SEARCH_COUNT" name="SEARCH_COUNT" type="number" min="1" max="20">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="PROMPTS_DIR">Prompt folder</label><button class="help" type="button" data-help="Folder containing system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, and email_signature.txt. The default ./prompts folder is included with this project." aria-label="About prompt files">?</button></div>
+              <input class="input" id="PROMPTS_DIR" name="PROMPTS_DIR" placeholder="./prompts">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-heading">Email sender</h2>
+          <p class="section-intro">SMTP sends the emails. For Gmail, use an App Password—not your normal Google password. The app does not send anything until you switch off dry-run mode.</p>
+          <div class="grid">
+            <div class="field">
+              <div class="field-heading"><label for="SMTP_HOST">SMTP host</label><button class="help" type="button" data-help="Mail provider's SMTP server. Gmail uses smtp.gmail.com. Your provider's SMTP documentation gives the host and port." aria-label="About SMTP host">?</button></div>
+              <input class="input" id="SMTP_HOST" name="SMTP_HOST">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SMTP_PORT">SMTP port</label><button class="help" type="button" data-help="Gmail with SSL uses 465. Some providers use 587 with STARTTLS. Use the port specified by your SMTP provider." aria-label="About SMTP port">?</button></div>
+              <input class="input" id="SMTP_PORT" name="SMTP_PORT" type="number" min="1" max="65535">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SMTP_USER">SMTP username / sender email</label><button class="help" type="button" data-help="The mailbox used to authenticate and send. For Gmail, this is the full Gmail address. This address appears as the sender." aria-label="About SMTP username">?</button></div>
+              <input class="input" id="SMTP_USER" name="SMTP_USER" type="email" autocomplete="username">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SMTP_PASS">SMTP password / App Password</label><button class="help" type="button" data-help="Gmail: enable 2-Step Verification, then Google Account → Security → App passwords; create an app password and enter it here. Do not use your regular Gmail password. Leave blank to keep the saved value." aria-label="Where to get an SMTP App Password">?</button><span class="secret-status" id="SMTP_PASS-status"></span></div>
+              <input class="input secret-input" id="SMTP_PASS" name="SMTP_PASS" type="password" autocomplete="new-password" placeholder="Saved password stays hidden; enter a replacement">
+              <label class="clear-secret"><input type="checkbox" name="clear_SMTP_PASS"> Remove saved password</label>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="FROM_NAME">From name</label><button class="help" type="button" data-help="Friendly sender name shown in the recipient's email inbox. It does not change the authenticated sender address." aria-label="About the sender name">?</button></div>
+              <input class="input" id="FROM_NAME" name="FROM_NAME">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SUBJECT">Email subject</label><button class="help" type="button" data-help="Subject line used for every generated outreach email." aria-label="About the email subject">?</button></div>
+              <input class="input" id="SUBJECT" name="SUBJECT">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-heading">Pacing and safety</h2>
+          <p class="section-intro">These controls preserve the mailer's existing send gates. A dashboard run may set its daily cap with the slider; this value is the default cap.</p>
+          <div class="grid">
+            <div class="field">
+              <div class="field-heading"><label for="PORT">Dashboard port</label><button class="help" type="button" data-help="Local web dashboard port. The default is 4173. If you change it, stop and restart the dashboard before opening it at the new address." aria-label="About the dashboard port">?</button></div>
+              <input class="input" id="PORT" name="PORT" type="number" min="1" max="65535">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="DAILY_LIMIT">Default daily limit</label><button class="help" type="button" data-help="Maximum number of successful live sends per sending day. The dashboard's daily limit slider overrides this value for that send run. Keep the cap conservative." aria-label="About the daily limit">?</button></div>
+              <input class="input" id="DAILY_LIMIT" name="DAILY_LIMIT" type="number" min="1" max="1000">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="MIN_DELAY_MIN">Minimum delay (minutes)</label><button class="help" type="button" data-help="Lower end of the randomized wait between messages. The mailer chooses a random delay between this value and the maximum." aria-label="About minimum send delay">?</button></div>
+              <input class="input" id="MIN_DELAY_MIN" name="MIN_DELAY_MIN" type="number" min="0" max="1440" step="0.1">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="MAX_DELAY_MIN">Maximum delay (minutes)</label><button class="help" type="button" data-help="Upper end of the randomized wait between messages. Must be equal to or larger than the minimum delay." aria-label="About maximum send delay">?</button></div>
+              <input class="input" id="MAX_DELAY_MIN" name="MAX_DELAY_MIN" type="number" min="0" max="1440" step="0.1">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="MIN_RATING">Minimum research-fit rating</label><button class="help" type="button" data-help="Generated hooks with a rating below this score are held back. Rating range is 0–10; 0 disables this filter." aria-label="About the minimum rating">?</button></div>
+              <input class="input" id="MIN_RATING" name="MIN_RATING" type="number" min="0" max="10" step="0.1">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SEND_LOW_CONFIDENCE">Low-confidence hooks</label><button class="help" type="button" data-help="When off, low-confidence hooks are held unless you explicitly set approved:true for that professor in hooks.json. When on, they may pass the confidence gate." aria-label="About low-confidence hooks">?</button></div>
+              <select id="SEND_LOW_CONFIDENCE" name="SEND_LOW_CONFIDENCE"><option value="false">Hold for manual review</option><option value="true">Allow to send</option></select>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="DRY_RUN">Email mode</label><button class="help" type="button" data-help="Safe mode writes email drafts to outbox and sends nothing. Live mode sends real emails and attaches the CV. Always inspect drafts first; the dashboard also asks for confirmation before live sending." aria-label="About dry-run mode">?</button></div>
+              <select id="DRY_RUN" name="DRY_RUN"><option value="true">Safe — save drafts only</option><option value="false">Live — send real emails</option></select>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-heading">What the mailer reads and creates</h2>
+          <p class="section-intro">Your selected list and the six prompt files are inputs. The remaining files are generated locally as you use the tool.</p>
+          <div class="field">
+            <p class="field-note"><strong>prompts/</strong> contains system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, and email_signature.txt. All six are needed; the default folder is included with the project.</p>
+            <p class="field-note"><strong>hooks.json</strong> stores generated drafts keyed by professor email. Review it before live sending; set <code>"approved": true</code> to force-send a held hook or <code>"approved": false</code> to reject it.</p>
+            <p class="field-note"><strong>state.json</strong> records completed sends and daily counts so the tool can resume after interruption. <strong>sent_log.csv</strong> records successful live sends. <strong>outbox/</strong> contains email drafts from safe mode.</p>
+            <p class="field-note">These files and all uploaded source documents stay in this project folder. The API keys and sender credentials are stored in <code>.env</code>, which is Git-ignored.</p>
+          </div>
+        </section>
+
+        <div class="footer">
+          <div class="footer-note">Saved locally to <code>.env</code>. Secrets are masked and remain on this computer.<br>Settings cannot be changed while a send or preview task is running.</div>
+          <button class="button primary" id="save-button" type="submit">Save settings</button>
+        </div>
+      </form>
+    </main>
+    <script src="/settings.js" defer></script>
+  </body>
+</html>

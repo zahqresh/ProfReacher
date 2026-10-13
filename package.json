@@ -6,7 +6,9 @@
   "scripts": {
     "preview": "node src/index.js preview",
     "start": "node src/index.js send",
-    "status": "node src/index.js status"
+    "status": "node src/index.js status",
+    "ui": "node src/ui.js",
+    "test": "node --test"
   },
   "engines": { "node": ">=18" },
   "dependencies": {

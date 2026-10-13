@@ -1,5 +1,7 @@
 node_modules
 .env
+professors.csv
+uploaded-cv.pdf
 Muhammad_Hamza_CV.pdf
 state.json
 hooks.json

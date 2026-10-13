@@ -1,4 +1,4 @@
-Web search results:
+Research context (OpenAlex and/or LangSearch):
 {{web}}
 
 Professor: {{name}}
