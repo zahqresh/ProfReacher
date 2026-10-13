@@ -1,0 +1,7 @@
+Dear Professor {{name}},
+
+I am Muhammad Hamza, an MS Computer Science graduate of Kohat University of Science and Technology (2026). My thesis work developed TransDTA, a sequence-based deep learning model for drug–target binding affinity prediction, evaluated on Davis (0.901) and KIBA (0.890). I also authored a chapter on Federated Learning in Healthcare (CRC Press/Taylor & Francis).
+
+{{hook}}
+
+I plan to apply for the CSC Scholarship 2027. Are you accepting PhD students for the 2027 intake, and would you be open to supporting my application? My CV is attached.

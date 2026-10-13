@@ -1,0 +1,17 @@
+{
+  "name": "csc-mailer",
+  "version": "1.0.0",
+  "description": "Personalised, rate-limited CSC 2027 professor outreach (OpenRouter hooks + SMTP)",
+  "type": "module",
+  "scripts": {
+    "preview": "node src/index.js preview",
+    "start": "node src/index.js send",
+    "status": "node src/index.js status"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.7",
+    "nodemailer": "^6.9.16"
+  }
+}

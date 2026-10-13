@@ -1,0 +1,7 @@
+Web search results:
+{{web}}
+
+Professor: {{name}}
+University: {{university}}
+Research interests (from sheet): {{interests}}
+Profile link: {{link}}
