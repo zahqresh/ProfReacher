@@ -4,6 +4,7 @@ import path from 'node:path';
 import { parse } from 'csv-parse/sync';
 import nodemailer from 'nodemailer';
 import { searchOpenAlexProfessor } from './openalex.js';
+import { createOpenRouterClient } from './openrouter.js';
 
 const env = process.env;
 const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ? Number(v) : d);
@@ -120,27 +121,12 @@ async function webSearch(r) {
 }
 
 // ---------------------------------------------------------------- hook generation
-async function callLLM(messages) {
-  const body = { model: cfg.model, messages, temperature: 0.3 };
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.status === 429 || res.status >= 500) {
-      log(`OpenRouter ${res.status}, retrying...`);
-      await sleep(15000 * (attempt + 1));
-      continue;
-    }
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${JSON.stringify(j.error || j).slice(0, 300)}`);
-    const t = j.choices?.[0]?.message?.content;
-    if (!t) throw new Error('empty LLM response');
-    return t;
-  }
-  throw new Error('OpenRouter retries exhausted');
-}
+const callLLM = createOpenRouterClient({
+  apiKey: cfg.apiKey,
+  baseUrl: cfg.baseUrl,
+  model: cfg.model,
+  log,
+});
 
 function parseHook(text) {
   const m = text.match(/\{[\s\S]*\}/);
@@ -186,11 +172,12 @@ async function generateHook(r) {
     { role: 'user', content: fill(loadPrompt('user.txt'), { ...r, interests: r.interests || 'n/a', link: r.link || 'n/a', web }) },
   ];
 
+  let response = await callLLM(make());
   try {
-    return parseHook(await callLLM(make()));
-  } catch (e) {
-    // one repair retry
-    return parseHook(await callLLM(make()));
+    return parseHook(response);
+  } catch {
+    response = await callLLM(make());
+    return parseHook(response);
   }
 }
 

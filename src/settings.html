@@ -129,7 +129,7 @@
               <label class="clear-secret"><input type="checkbox" name="clear_OPENROUTER_API_KEY"> Remove saved key</label>
             </div>
             <div class="field">
-              <div class="field-heading"><label for="OPENROUTER_MODEL">OpenRouter model</label><button class="help" type="button" data-help="Model identifier sent to OpenRouter, such as openrouter/free or an available provider/model ID from openrouter.ai/models." aria-label="About the OpenRouter model">?</button></div>
+              <div class="field-heading"><label for="OPENROUTER_MODEL">OpenRouter model</label><button class="help" type="button" data-help="Model identifier sent to OpenRouter, such as openrouter/free or an available provider/model ID from openrouter.ai/models. The free router chooses an available free model automatically. Free-model limits currently include 20 requests per minute and a daily allowance that depends on your account; this app checks the remaining daily allowance, spaces requests, honors Retry-After, and retries temporary failures. If your daily allowance is used up, wait for reset or choose another model." aria-label="About the OpenRouter model">?</button></div>
               <input class="input" id="OPENROUTER_MODEL" name="OPENROUTER_MODEL" placeholder="openrouter/free">
             </div>
             <div class="field">

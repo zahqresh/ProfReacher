@@ -62,7 +62,7 @@ The app creates `.env`, uploaded files, generated hooks, send history, and progr
   - `Research Interests`
   - `Applied`
 - An SMTP sender account and CV file for live email sending
-- An OpenRouter API key for hook generation
+- An OpenRouter API key for hook generation (the default free router has rate and daily request limits)
 - A LangSearch API key for additional web-assisted research (optional)
 
 ## Get started
@@ -162,6 +162,7 @@ DRY_RUN=true
 - `USE_WEB_SEARCH=true` additionally uses LangSearch and requires `LANGSEARCH_API_KEY`; it is independent of OpenAlex. When enabled, OpenAlex and LangSearch research contexts are combined in the prompt sent to OpenRouter. Both sources can be turned off.
 - `DRY_RUN=true` keeps the script in safe mode and writes generated email drafts to `outbox/` instead of emailing anyone.
 - `MIN_RATING` and `SEND_LOW_CONFIDENCE` are used to filter or hold low-fit or low-confidence hooks.
+- The default `OPENROUTER_MODEL=openrouter/free` automatically selects an available free model. OpenRouter currently documents a 20 requests/minute limit for free models and a daily quota that depends on account credit status. The app checks the key's remaining free-model daily allowance before inference, spaces requests to stay below the per-minute limit, honors `Retry-After`, and retries temporary network, rate-limit, and server errors with backoff. The daily allowance may still be consumed by other apps using the same OpenRouter account/key. See [OpenRouter rate limits](https://openrouter.ai/docs/api-reference/limits); if the free quota is exhausted, wait for reset or select another model in Settings.
 
 ## Available commands
 
