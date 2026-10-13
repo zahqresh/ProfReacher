@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'csv-parse/sync';
 import nodemailer from 'nodemailer';
+import { searchOpenAlexProfessor } from './openalex.js';
 
 const env = process.env;
 const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ? Number(v) : d);
@@ -22,8 +23,10 @@ const cfg = {
   baseUrl: env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
   model: env.OPENROUTER_MODEL || 'openrouter/free',
   langKey: env.LANGSEARCH_API_KEY || '',
+  openAlexKey: env.OPENALEX_API_KEY || '',
   searchCount: num(env.SEARCH_COUNT, 5),
   useWeb: env.USE_WEB_SEARCH !== 'false',
+  useOpenAlex: env.OPENALEX_ENABLED === 'true' && Boolean(env.OPENALEX_API_KEY),
   dailyLimit: num(env.DAILY_LIMIT, 20),
   minDelay: num(env.MIN_DELAY_MIN, 1),
   maxDelay: num(env.MAX_DELAY_MIN, 3),
@@ -159,16 +162,25 @@ function parseHook(text) {
 async function generateHook(r) {
   if (!cfg.apiKey) throw new Error('OPENROUTER_API_KEY missing');
 
-  let ctx = '';
+  const contexts = [];
   if (cfg.useWeb) {
     try {
-      ctx = await webSearch(r);
+      const context = await webSearch(r);
+      if (context) contexts.push(`LANGSEARCH WEB RESULTS\n${context}`);
     } catch (e) {
-      log(`  web search failed (${e.message.slice(0, 120)}); continuing without it`);
+      log(`  LangSearch failed (${e.message.slice(0, 120)}); continuing with other research sources`);
+    }
+  }
+  if (cfg.useOpenAlex) {
+    try {
+      const context = await searchOpenAlexProfessor(r, { apiKey: cfg.openAlexKey });
+      if (context) contexts.push(context);
+    } catch (e) {
+      log(`  OpenAlex failed (${e.message.slice(0, 120)}); continuing with other research sources`);
     }
   }
 
-  const web = ctx || loadPrompt('no_web.txt');
+  const web = contexts.join('\n\n') || loadPrompt('no_web.txt');
   const make = () => [
     { role: 'system', content: loadPrompt('system.txt') },
     { role: 'user', content: fill(loadPrompt('user.txt'), { ...r, interests: r.interests || 'n/a', link: r.link || 'n/a', web }) },
@@ -350,14 +362,15 @@ async function send() {
 async function status() {
   const { rows, state, pending } = await getPending();
   const hooks = readJson(HOOKS_FILE, {});
-  console.log({
+  const result = {
     eligibleRows: rows.length,
     sent: Object.keys(state.sent).length,
     pending: pending.length,
     hooksReady: pending.filter((r) => hooks[r.email]).length,
     sentToday: state.days[dayKey()] || 0,
     failed: Object.keys(state.failed).length,
-  });
+  };
+  console.log(process.env.STATUS_JSON === '1' ? JSON.stringify(result) : result);
 }
 
 const [cmd = 'send', arg] = process.argv.slice(2);

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f5f7">
+    <title>CSC Mailer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        color: #1d1d1f;
+        background: #f5f5f7;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --muted: #86868b;
+        --line: #e7e7e9;
+        --blue: #0071e3;
+        --green: #248a52;
+        --red: #d93025;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      .page { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 48px 0 56px; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 54px; }
+      .brand { display: flex; align-items: center; gap: 11px; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+      .brand-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; color: white; background: #1d1d1f; font-size: 15px; }
+      .nav-link { padding: 9px 13px; border: 1px solid var(--line); border-radius: 10px; color: #424245; background: #fff; font-size: 12px; font-weight: 600; text-decoration: none; }
+      .connection { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: #b8b8bd; }
+      .dot.online { background: #30b566; box-shadow: 0 0 0 3px #30b5661c; }
+      .intro { margin-bottom: 34px; }
+      .eyebrow { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: clamp(36px, 5vw, 54px); line-height: 1.05; letter-spacing: -.055em; font-weight: 680; }
+      .subtitle { margin: 14px 0 0; color: #6e6e73; font-size: 16px; line-height: 1.55; }
+      .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0 18px; }
+      .card, .panel { border: 1px solid #e9e9eb; border-radius: 18px; background: #fff; box-shadow: 0 2px 8px #00000005; }
+      .card { padding: 19px 20px; }
+      .card-label { color: var(--muted); font-size: 12px; }
+      .card-value { margin-top: 10px; font-size: 27px; font-weight: 650; letter-spacing: -.04em; }
+      .panel { padding: 24px; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: stretch; }
+      .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+      h2 { margin: 0; font-size: 17px; letter-spacing: -.025em; }
+      .description { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+      .mode { padding: 6px 9px; border-radius: 20px; color: var(--green); background: #eef8f1; font-size: 11px; font-weight: 650; white-space: nowrap; }
+      .mode.live { color: #a33c22; background: #fff2ed; }
+      .control { padding: 18px 0 20px; border-top: 1px solid var(--line); }
+      .control-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .control-title { font-size: 13px; font-weight: 620; }
+      .control-value { min-width: 42px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+      input[type="range"] { display: block; width: 100%; margin: 17px 0 0; accent-color: var(--blue); }
+      .range-labels { display: flex; justify-content: space-between; margin-top: 7px; color: #a1a1a6; font-size: 10px; }
+      .action { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+      .button { min-height: 42px; padding: 0 15px; border: 0; border-radius: 11px; font-size: 13px; font-weight: 620; transition: opacity .15s, transform .15s; }
+      .button:hover:not(:disabled) { transform: translateY(-1px); }
+      .button:disabled { cursor: not-allowed; opacity: .43; }
+      .button.primary { color: white; background: var(--blue); }
+      .button.secondary { color: #1d1d1f; background: #f1f1f3; }
+      .button.stop { color: #fff; background: #d93025; }
+      .hint { min-height: 18px; margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+      .progress-area { margin-top: 17px; }
+      .progress-track { height: 4px; overflow: hidden; border-radius: 5px; background: #e9e9eb; }
+      .progress-fill { height: 100%; border-radius: inherit; background: var(--blue); transition: width .25s ease; }
+      .progress-fill.indeterminate { width: 35%; background: linear-gradient(90deg, #9ccaff, var(--blue), #9ccaff); background-size: 200% 100%; animation: progress-sweep 1.25s ease-in-out infinite; }
+      .progress-caption { margin-top: 7px; color: var(--muted); font-size: 10px; }
+      @keyframes progress-sweep { from { transform: translateX(-110%); } to { transform: translateX(310%); } }
+      .live-label.busy::before { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border: 1.5px solid #d4d4d8; border-top-color: var(--blue); border-radius: 50%; content: ""; vertical-align: -1px; animation: spin .8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .logs-panel { padding: 0; overflow: hidden; }
+      .logs-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 19px 21px; border-bottom: 1px solid var(--line); }
+      .logs-title { display: flex; align-items: center; gap: 9px; }
+      .logs-title h2 { font-size: 14px; }
+      .live-label { color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+      .log-box { height: 390px; padding: 12px 0; overflow: auto; background: #fcfcfd; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11px; line-height: 1.7; }
+      .log-row { display: grid; grid-template-columns: 68px 1fr; gap: 12px; padding: 3px 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .log-time { color: #a1a1a6; }
+      .log-text { color: #45454a; }
+      .log-row.stderr .log-text { color: #bd3128; }
+      .log-row.system .log-text { color: var(--blue); }
+      .empty-log { padding: 24px 18px; color: #a1a1a6; font-family: inherit; font-size: 12px; }
+      .logs-footer { display: flex; justify-content: space-between; padding: 11px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+      .notice { display: flex; gap: 12px; margin-top: 17px; padding: 14px 16px; border: 1px solid #e9e9eb; border-radius: 14px; background: #ffffffa8; color: #6e6e73; font-size: 12px; line-height: 1.5; }
+      .notice-icon { color: #d28b00; font-weight: 700; }
+      .error { margin-top: 12px; color: var(--red); font-size: 12px; }
+      @media (max-width: 760px) {
+        .page { width: min(100% - 28px, 560px); padding-top: 28px; }
+        .topbar { margin-bottom: 38px; }
+        .workspace { grid-template-columns: 1fr; }
+        .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+        .card { padding: 15px; }
+        .card-value { font-size: 23px; }
+        .panel { padding: 19px; }
+        .logs-panel { padding: 0; }
+        .log-box { height: 300px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">C</span> CSC Mailer</div>
+        <div style="display:flex;align-items:center;gap:18px">
+          <a class="nav-link" href="/settings">Settings</a>
+          <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Connecting</span></div>
+        </div>
+      </header>
+
+      <section class="intro">
+        <p class="eyebrow">Outreach workspace</p>
+        <h1>Thoughtful outreach,<br>at your pace.</h1>
+        <p class="subtitle">Prepare professor-specific hooks, review your setup, and follow every task as it happens.</p>
+      </section>
+
+      <section class="cards" aria-label="Mailer status">
+        <article class="card"><div class="card-label">Eligible professors</div><div class="card-value" id="eligible">—</div></article>
+        <article class="card"><div class="card-label">Pending</div><div class="card-value" id="pending">—</div></article>
+        <article class="card"><div class="card-label">Hooks ready</div><div class="card-value" id="hooks-ready">—</div></article>
+        <article class="card"><div class="card-label">Sent today</div><div class="card-value" id="sent-today">—</div></article>
+      </section>
+
+      <section class="workspace">
+        <article class="panel">
+          <div class="section-heading">
+            <div><h2>Run your workflow</h2><p class="description">Choose a task and tune its limit.</p></div>
+            <span class="mode" id="mode-pill">SAFE MODE</span>
+          </div>
+
+          <div class="control">
+            <div class="control-top"><span class="control-title">Preview hooks</span><output class="control-value" id="preview-value">20</output></div>
+            <input id="preview-limit" type="range" min="1" max="100" value="20" aria-label="Number of hooks to preview">
+            <div class="range-labels"><span>1 professor</span><span>100 professors</span></div>
+          </div>
+
+          <div class="control">
+            <div class="control-top"><span class="control-title">Daily send limit</span><output class="control-value" id="send-value">20</output></div>
+            <input id="send-limit" type="range" min="1" max="100" value="20" aria-label="Daily email limit">
+            <div class="range-labels"><span>1 email / day</span><span>100 emails / day</span></div>
+          </div>
+
+          <div class="action">
+            <button class="button primary" id="preview-button" disabled>Generate preview</button>
+            <button class="button secondary" id="send-button" disabled>Start sending</button>
+            <button class="button stop" id="stop-button" hidden>Stop</button>
+          </div>
+          <div class="progress-area" id="progress-area" hidden>
+            <div class="progress-track"><div class="progress-fill indeterminate" id="progress-fill"></div></div>
+            <div class="progress-caption" id="progress-caption">Starting task…</div>
+          </div>
+          <p class="hint" id="task-hint">Preview creates hooks for review. Sending follows your .env mode and existing pacing rules.</p>
+          <div class="error" id="error-message" role="alert" hidden></div>
+        </article>
+
+        <article class="panel logs-panel">
+          <header class="logs-header">
+            <div class="logs-title"><h2>Activity</h2><span class="live-label" id="activity-status">Ready</span></div>
+            <button class="button secondary" id="clear-button" style="min-height:30px;padding:0 10px;font-size:11px">Clear</button>
+          </header>
+          <div class="log-box" id="log-box" aria-live="polite"><div class="empty-log">Your live activity will appear here.</div></div>
+          <footer class="logs-footer"><span id="log-count">0 events</span><span>Live output</span></footer>
+        </article>
+      </section>
+
+      <aside class="notice"><span class="notice-icon">i</span><span>Review generated hooks before sending. In live mode, emails are sent through your configured SMTP account with the daily cap and randomized delays from .env. Stop leaves saved progress available for a later run.</span></aside>
+    </main>
+    <script src="/dashboard.js" defer></script>
+  </body>
+</html>
