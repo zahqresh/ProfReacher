@@ -1,4 +1,4 @@
-# CSC Mailer
+# ProfReacher
 
 A Node.js workflow for sending personalised cold emails to professors as part of a CSC PhD application campaign. It reads professor records from a Google Sheet or local CSV, optionally enriches them with web research, generates a tailored opening hook with an LLM, stores manual approval decisions, and sends emails through SMTP with pacing safeguards.
 
@@ -18,7 +18,7 @@ A Node.js workflow for sending personalised cold emails to professors as part of
 ## Project structure
 
 ```text
-csc-mailer/
+ProfReacher/
 ├── .env.example
 ├── .env
 ├── README.md
