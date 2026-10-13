@@ -2,6 +2,10 @@
 
 A Node.js workflow for sending personalised cold emails to professors as part of a CSC PhD application campaign. It reads professor records from a Google Sheet or local CSV, optionally enriches them with web research, generates a tailored opening hook with an LLM, stores manual approval decisions, and sends emails through SMTP with pacing safeguards.
 
+![CSC Mailer dashboard](./screenshots/dashboard.png)
+
+*Dashboard preview; live professor counts and activity have been omitted from the screenshot.*
+
 ## What this project does
 
 - Loads professor data from either:
@@ -21,11 +25,9 @@ A Node.js workflow for sending personalised cold emails to professors as part of
 ```text
 ProfReacher/
 ├── .env.example
-├── .env
 ├── README.md
-├── hooks.json
-├── sent_log.csv
-├── state.json
+├── screenshots/
+│   └── dashboard.png
 ├── prompts/
 │   ├── email_body.txt
 │   ├── email_signature.txt
@@ -44,11 +46,10 @@ ProfReacher/
 ├── test/
 │   └── openalex.test.js
 ├── package.json
-├── package-lock.json
-├── Muhammad_Hamza_CV.pdf
-├── uploaded-cv.pdf  (optional local upload; Git-ignored)
-└── professors.csv   (optional local source; Git-ignored)
+└── package-lock.json
 ```
+
+The app creates `.env`, uploaded files, generated hooks, send history, and progress data locally as needed. These files are Git-ignored and are not included in a fresh download.
 
 ## Requirements
 
@@ -60,18 +61,58 @@ ProfReacher/
   - `Profile Link`
   - `Research Interests`
   - `Applied`
-- An SMTP sender account (Gmail is the tested/default choice)
+- An SMTP sender account and CV file for live email sending
 - An OpenRouter API key for hook generation
 - A LangSearch API key for additional web-assisted research (optional)
-- A CV file path for attachment
 
-## Installation
+## Get started
 
-```bash
-npm install
-```
+No programming experience is required. The dashboard guides you through setup.
 
-Start the dashboard with `npm run ui`, open `http://127.0.0.1:4173`, and use **Settings** to configure the tool. The settings page creates or updates `.env` locally. If you prefer to configure it manually, copy `.env.example` to `.env` first (`Copy-Item .env.example .env` in PowerShell).
+1. Install [Node.js 18 or newer](https://nodejs.org/). Git is optional if you download the project as a ZIP.
+2. Get the project from [GitHub](https://github.com/zahqresh/ProfReacher). To use Git, open a terminal and run:
+
+   ```bash
+   git clone https://github.com/zahqresh/ProfReacher.git
+   cd ProfReacher
+   ```
+
+   Alternatively, choose **Code → Download ZIP** on GitHub, extract it, and open a terminal in the extracted `ProfReacher` folder.
+3. Install the app's dependencies:
+
+   ```bash
+   npm install
+   ```
+
+4. Start the dashboard:
+
+   ```bash
+   npm run ui
+   ```
+
+5. Open [http://127.0.0.1:4173](http://127.0.0.1:4173) in your browser. Keep the terminal window open while using the app; press `Ctrl+C` there when you want to stop the local dashboard.
+
+The dashboard runs on your computer and listens only on `127.0.0.1`; it is not published to your network or hosted as a public website.
+
+## Configure and use the app
+
+1. Open **Settings** in the dashboard.
+2. Add your professor list by uploading a CSV or entering a Google Sheets link. The CSV must include these headers: `Name`, `University`, `Email`, `Profile Link`, `Research Interests`, and `Applied`. For Google Sheets, set sharing to **Anyone with the link can view**.
+3. Add an OpenRouter API key to generate personalized hooks. Create a key at [OpenRouter](https://openrouter.ai/keys). LangSearch and OpenAlex are optional research sources; each can be enabled in Settings when configured. OpenAlex keys are available at [OpenAlex API settings](https://openalex.org/settings/api).
+4. Upload your CV if you intend to send live emails. For Gmail, create an App Password in your Google Account's Security settings and enter it in the SMTP password field; do not use your normal Google password.
+5. Review the settings and choose **Save settings**. Settings are saved to `.env` on this computer; API keys and passwords are masked in the browser and `.env` is Git-ignored.
+6. Return to the dashboard and choose **Generate preview**. Inspect the generated hooks and email drafts before sending. Safe mode is the default and saves drafts to `outbox/` without emailing anyone.
+7. Only when you are ready to send real emails, change **Email mode** to **Live** in Settings, save, then choose **Start sending** and confirm the dashboard prompt. The daily limit and pacing safeguards still apply.
+
+Open **Settings** at any time to update the list, credentials, research options, or safety settings. The `?` buttons explain individual fields.
+
+### Optional future idea
+
+A lightweight TODO list for tracking follow-up tasks (for example, reviewing a professor's hook or planning a follow-up) could be added in a future version. TODO tracking is not part of the current app.
+
+## Manual configuration (optional)
+
+For manual configuration, copy `.env.example` to `.env` first (`Copy-Item .env.example .env` in PowerShell). Most users can configure the app in the dashboard instead.
 
 ## Environment variables
 
@@ -85,15 +126,15 @@ PORT=4173
 SHEET_CSV_URL=
 CSV_PATH=./professors.csv
 
-CV_PATH=./Muhammad_Hamza_CV.pdf
+CV_PATH=./your-cv.pdf
 PROMPTS_DIR=./prompts
 
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_USER=yourname@gmail.com
 SMTP_PASS=xxxx xxxx xxxx xxxx
-FROM_NAME=Muhammad Hamza
-SUBJECT=CSC 2027 PhD Application Enquiry - Muhammad Hamza
+FROM_NAME=Your Name
+SUBJECT=PhD application enquiry - Your Name
 
 OPENROUTER_API_KEY=sk-or-...
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
@@ -102,7 +143,7 @@ USE_WEB_SEARCH=true
 OPENALEX_ENABLED=false
 OPENALEX_API_KEY=
 
-LANGSEARCH_API_KEY=*************
+LANGSEARCH_API_KEY=your-langsearch-api-key
 SEARCH_COUNT=5
 
 DAILY_LIMIT=20
