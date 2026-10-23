@@ -69,13 +69,12 @@
         .footer { align-items: flex-start; flex-direction: column; }
       }
     </style>
+    <link rel="stylesheet" href="/app.css">
   </head>
-  <body>
+  <body class="app-shell">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
     <main class="page">
-      <header class="topbar">
-        <div class="brand"><span class="brand-mark">C</span> CSC Mailer</div>
-        <a class="nav-link" href="/">← Dashboard</a>
-      </header>
+      <header class="topbar" id="app-header"></header>
 
       <p class="eyebrow">Local configuration</p>
       <h1>Everything in one place.</h1>
@@ -162,7 +161,7 @@
               <input class="input" id="SEARCH_COUNT" name="SEARCH_COUNT" type="number" min="1" max="20">
             </div>
             <div class="field">
-              <div class="field-heading"><label for="PROMPTS_DIR">Prompt folder</label><button class="help" type="button" data-help="Folder containing system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, and email_signature.txt. The default ./prompts folder is included with this project." aria-label="About prompt files">?</button></div>
+              <div class="field-heading"><label for="PROMPTS_DIR">Prompt folder</label><button class="help" type="button" data-help="Folder containing system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, email_signature.txt, and follow_up.txt. The default ./prompts folder is included with this project." aria-label="About prompt files">?</button></div>
               <input class="input" id="PROMPTS_DIR" name="PROMPTS_DIR" placeholder="./prompts">
             </div>
           </div>
@@ -198,6 +197,57 @@
               <input class="input" id="SUBJECT" name="SUBJECT">
             </div>
           </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-heading">Reply tracking and follow-ups</h2>
+          <p class="section-intro">The Follow-ups page checks your inbox over IMAP (not Gmail API) and matches replies to sent mail. Blank IMAP username/password fields reuse the SMTP sender credentials. For Gmail, enable IMAP and use the same App Password.</p>
+          <div class="grid">
+            <div class="field">
+              <div class="field-heading"><label for="IMAP_HOST">IMAP host</label><button class="help" type="button" data-help="Gmail uses imap.gmail.com. Your email provider's IMAP documentation gives the correct host." aria-label="About IMAP host">?</button></div>
+              <input class="input" id="IMAP_HOST" name="IMAP_HOST">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="IMAP_PORT">IMAP port</label><button class="help" type="button" data-help="Gmail and most providers use secure IMAP on port 993." aria-label="About IMAP port">?</button></div>
+              <input class="input" id="IMAP_PORT" name="IMAP_PORT" type="number" min="1" max="65535">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="IMAP_USER">IMAP username</label></div>
+              <input class="input" id="IMAP_USER" name="IMAP_USER" autocomplete="username" placeholder="Blank uses SMTP username">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="IMAP_PASS">IMAP password / App Password</label><span class="secret-status" id="IMAP_PASS-status"></span></div>
+              <input class="input secret-input" id="IMAP_PASS" name="IMAP_PASS" type="password" autocomplete="new-password" placeholder="Blank uses SMTP password">
+              <label class="clear-secret"><input type="checkbox" name="clear_IMAP_PASS"> Remove saved IMAP password</label>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="FOLLOW_UP_DAYS">Follow up after (days)</label><button class="help" type="button" data-help="An email becomes eligible after this many full days if no reply has been detected and no follow-up has already been sent." aria-label="About follow-up timing">?</button></div>
+              <input class="input" id="FOLLOW_UP_DAYS" name="FOLLOW_UP_DAYS" type="number" min="1" max="365">
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="schedule-section">
+          <h2 class="section-heading">Daily email schedule</h2>
+          <p class="section-intro">This computer will send a campaign once per local calendar day at the chosen time, up to the daily limit. Keep the dashboard running and the computer awake. This is a local SMTP schedule, not Gmail’s own Schedule send feature.</p>
+          <div class="grid">
+            <div class="field">
+              <div class="field-heading"><label for="SCHEDULE_ENABLED">Automatic daily sending</label></div>
+              <select id="SCHEDULE_ENABLED" name="SCHEDULE_ENABLED">
+                <option value="false">Off</option>
+                <option value="true">On — send automatically</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SCHEDULE_TIME">Start time (this computer)</label></div>
+              <input class="input" id="SCHEDULE_TIME" name="SCHEDULE_TIME" type="time">
+            </div>
+            <div class="field">
+              <div class="field-heading"><label for="SCHEDULE_DAILY_LIMIT">Maximum campaign emails per day</label></div>
+              <input class="input" id="SCHEDULE_DAILY_LIMIT" name="SCHEDULE_DAILY_LIMIT" type="number" min="1" max="1000">
+            </div>
+          </div>
+          <p class="field-note">Automatic sending requires Live mode, a valid CV, and SMTP credentials. A scheduled run stops when its daily quota is reached. Every message still passes your existing hook approval and safety gates.</p>
         </section>
 
         <section class="section">
@@ -237,21 +287,24 @@
 
         <section class="section">
           <h2 class="section-heading">What the mailer reads and creates</h2>
-          <p class="section-intro">Your selected list and the six prompt files are inputs. The remaining files are generated locally as you use the tool.</p>
+          <p class="section-intro">Your selected list and the seven prompt files are inputs. The remaining files are generated locally as you use the tool.</p>
           <div class="field">
-            <p class="field-note"><strong>prompts/</strong> contains system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, and email_signature.txt. All six are needed; the default folder is included with the project.</p>
+            <p class="field-note"><strong>prompts/</strong> contains system.txt, user.txt, no_web.txt, search_query.txt, email_body.txt, email_signature.txt, and follow_up.txt. All seven are needed; the default folder is included with the project.</p>
             <p class="field-note"><strong>hooks.json</strong> stores generated drafts keyed by professor email. Review it before live sending; set <code>"approved": true</code> to force-send a held hook or <code>"approved": false</code> to reject it.</p>
-            <p class="field-note"><strong>state.json</strong> records completed sends and daily counts so the tool can resume after interruption. <strong>sent_log.csv</strong> records successful live sends. <strong>outbox/</strong> contains email drafts from safe mode.</p>
+            <p class="field-note"><strong>state.json</strong> records sends, daily counts, detected replies, and follow-up history so the tool can resume after interruption. <strong>sent_log.csv</strong> records successful live sends. <strong>outbox/</strong> contains email drafts from safe mode.</p>
             <p class="field-note">These files and all uploaded source documents stay in this project folder. The API keys and sender credentials are stored in <code>.env</code>, which is Git-ignored.</p>
           </div>
         </section>
 
         <div class="footer">
-          <div class="footer-note">Saved locally to <code>.env</code>. Secrets are masked and remain on this computer.<br>Settings cannot be changed while a send or preview task is running.</div>
+          <div class="footer-note">Saved locally to <code>.env</code>. Secrets are masked and remain on this computer.<br>Settings cannot be changed while a task is running.</div>
           <button class="button primary" id="save-button" type="submit">Save settings</button>
         </div>
       </form>
     </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app-header.js" defer></script>
+    <script src="/theme.js" defer></script>
     <script src="/settings.js" defer></script>
   </body>
 </html>

@@ -1,0 +1,8 @@
+Dear {{name}},
+
+I hope you are doing well. I wanted to briefly follow up on my email of {{sentDate}} about the possibility of pursuing a PhD with your group at {{university}}. I understand you have a busy schedule, and I would be grateful for any update when convenient.
+
+Thank you for your time and consideration.
+
+Best regards,
+{{fromName}}

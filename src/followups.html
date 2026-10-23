@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f5f7">
+    <title>Follow-ups · CSC Mailer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        color: #1d1d1f;
+        background: #f5f5f7;
+        --muted: #77777c;
+        --line: #e7e7e9;
+        --blue: #0071e3;
+        --green: #248a52;
+        --red: #d93025;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; }
+      button { font: inherit; cursor: pointer; }
+      .page { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 36px 0 60px; }
+      .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 42px; }
+      .brand { display: flex; align-items: center; gap: 11px; font-size: 15px; font-weight: 650; }
+      .brand-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; color: white; background: #1d1d1f; }
+      .nav { display: flex; gap: 8px; }
+      .nav-link { padding: 9px 13px; border: 1px solid var(--line); border-radius: 10px; color: #424245; background: #fff; font-size: 12px; font-weight: 600; text-decoration: none; }
+      .eyebrow { margin: 0 0 10px; color: var(--blue); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: clamp(35px, 5vw, 48px); line-height: 1.07; letter-spacing: -.05em; }
+      .subtitle { max-width: 750px; margin: 12px 0 24px; color: #6e6e73; font-size: 14px; line-height: 1.6; }
+      .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 22px 0 16px; }
+      .card, .panel { border: 1px solid #e9e9eb; border-radius: 16px; background: white; box-shadow: 0 2px 8px #00000005; }
+      .card { padding: 17px 18px; }
+      .card-label { color: var(--muted); font-size: 12px; }
+      .card-value { margin-top: 9px; font-size: 25px; font-weight: 650; }
+      .panel { margin-top: 15px; overflow: hidden; }
+      .panel-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+      h2 { margin: 0; font-size: 15px; }
+      .meta { color: var(--muted); font-size: 11px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+      .button { min-height: 38px; padding: 0 13px; border: 0; border-radius: 10px; font-size: 12px; font-weight: 620; }
+      .button.primary { color: white; background: var(--blue); }
+      .button.secondary { color: #1d1d1f; background: #f0f0f2; }
+      .button:disabled { cursor: wait; opacity: .5; }
+      .status { margin: 13px 20px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .status.error { color: var(--red); }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; text-align: left; }
+      th, td { padding: 12px 16px; border-bottom: 1px solid #f0f0f2; font-size: 12px; vertical-align: top; }
+      th { color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+      td strong { display: block; font-size: 12px; font-weight: 620; }
+      td span { display: block; margin-top: 4px; color: var(--muted); }
+      td select { display: block; width: 140px; margin-bottom: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 7px; background: white; font-size: 11px; }
+      td .button { min-height: 28px; padding: 0 9px; font-size: 10px; }
+      .empty { padding: 22px 18px; color: var(--muted); font-size: 12px; }
+      @media (max-width: 700px) {
+        .page { width: min(100% - 24px, 560px); padding-top: 24px; }
+        .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .card { padding: 14px; }
+        .card-value { font-size: 22px; }
+        .panel-header { align-items: flex-start; flex-direction: column; }
+        th, td { padding: 10px 12px; }
+      }
+    </style>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body class="app-shell">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+    <main class="page">
+      <header class="topbar" id="app-header"></header>
+
+      <p class="eyebrow">Reply management</p>
+      <h1>Follow up thoughtfully.</h1>
+      <p class="subtitle">Check your inbox for replies, review people who have not replied after the configured waiting period, and prepare or send one follow-up per person. Record interested, declined, or do-not-contact outcomes to keep future outreach respectful. Inbox checking uses IMAP; messages are sent through your existing SMTP account.</p>
+
+      <section class="cards" aria-label="Follow-up statistics">
+        <article class="card"><div class="card-label">Emails sent</div><div class="card-value" id="sent-count">—</div></article>
+        <article class="card"><div class="card-label">Replies detected</div><div class="card-value" id="replied-count">—</div></article>
+        <article class="card"><div class="card-label">Ready to follow up</div><div class="card-value" id="due-count">—</div></article>
+        <article class="card"><div class="card-label">Follow-ups sent</div><div class="card-value" id="followups-sent-count">—</div></article>
+        <article class="card"><div class="card-label">Outcomes recorded</div><div class="card-value" id="outcomes-count">—</div></article>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Follow-up run</h2>
+            <div class="meta" id="run-summary">Loading settings…</div>
+          </div>
+          <div class="actions">
+            <button class="button secondary" id="check-button">Check inbox for replies</button>
+            <button class="button primary" id="send-button">Prepare follow-ups</button>
+            <button class="button secondary" id="stop-button" hidden>Stop run</button>
+          </div>
+        </header>
+        <p class="status" id="task-status" role="status">Loading follow-up status…</p>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header"><h2>Potential follow-ups</h2><span class="meta" id="due-meta"></span></header>
+        <div class="table-wrap" id="due-table"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header"><h2>Replies detected</h2><span class="meta">Updated when you check the inbox</span></header>
+        <div class="table-wrap" id="replies-table"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header"><h2>Recorded outcomes and do-not-contact list</h2><span class="meta">These contacts are excluded from future outreach</span></header>
+        <div class="table-wrap" id="outcomes-table"></div>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app-header.js" defer></script>
+    <script src="/theme.js" defer></script>
+    <script src="/followups.js" defer></script>
+  </body>
+</html>
