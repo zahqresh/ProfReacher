@@ -10,10 +10,15 @@
     "ui": "node src/ui.js",
     "test": "node --test"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "csv-parse": "^5.6.0",
     "dotenv": "^16.4.7",
-    "nodemailer": "^6.9.16"
+    "imapflow": "^2.9.1",
+    "mailparser": "^3.12.4",
+    "nodemailer": "^6.9.16",
+    "socket.io": "^4.8.4"
   }
 }

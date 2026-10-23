@@ -3,8 +3,10 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Server as SocketServer } from 'socket.io';
 import { parse } from 'csv-parse/sync';
 import { fileURLToPath } from 'node:url';
+import { isScheduleDue, localScheduleDate } from './scheduler.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 4173);
@@ -13,11 +15,17 @@ const maxLogs = 500;
 const projectRoot = path.dirname(root);
 const envPath = path.join(projectRoot, '.env');
 const clients = new Set();
+const statePath = path.join(projectRoot, 'state.json');
 let job = null;
 let child = null;
 let logHistory = [];
+let scheduleTimer = null;
+let scheduleState = { lastRunDay: null, lastRunAt: null };
+let scheduledBusyNoticeDay = null;
+let io;
 
 function sendEvent(event, data) {
+  io?.emit(event, data);
   const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const response of clients) response.write(message);
 }
@@ -72,10 +80,12 @@ function requireLocalOrigin(request) {
   }
 }
 
-const secretKeys = new Set(['SMTP_PASS', 'OPENROUTER_API_KEY', 'LANGSEARCH_API_KEY', 'OPENALEX_API_KEY']);
+const secretKeys = new Set(['SMTP_PASS', 'IMAP_PASS', 'OPENROUTER_API_KEY', 'LANGSEARCH_API_KEY', 'OPENALEX_API_KEY']);
 const settingKeys = [
   'PORT', 'SHEET_CSV_URL', 'CSV_PATH', 'CV_PATH', 'PROMPTS_DIR',
   'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_NAME', 'SUBJECT',
+  'IMAP_HOST', 'IMAP_PORT', 'IMAP_USER', 'IMAP_PASS', 'FOLLOW_UP_DAYS',
+  'SCHEDULE_ENABLED', 'SCHEDULE_TIME', 'SCHEDULE_DAILY_LIMIT',
   'OPENROUTER_API_KEY', 'OPENROUTER_BASE_URL', 'OPENROUTER_MODEL',
   'LANGSEARCH_API_KEY', 'OPENALEX_API_KEY', 'SEARCH_COUNT', 'USE_WEB_SEARCH', 'OPENALEX_ENABLED',
   'DAILY_LIMIT', 'MIN_DELAY_MIN', 'MAX_DELAY_MIN', 'MIN_RATING',
@@ -93,6 +103,14 @@ function readSettings() {
     SMTP_PORT: '465',
     SMTP_USER: '',
     SMTP_PASS: '',
+    IMAP_HOST: 'imap.gmail.com',
+    IMAP_PORT: '993',
+    IMAP_USER: '',
+    IMAP_PASS: '',
+    FOLLOW_UP_DAYS: '7',
+    SCHEDULE_ENABLED: 'false',
+    SCHEDULE_TIME: '09:00',
+    SCHEDULE_DAILY_LIMIT: '20',
     FROM_NAME: 'Muhammad Hamza',
     SUBJECT: 'CSC 2027 PhD Application Enquiry - Muhammad Hamza',
     OPENROUTER_API_KEY: '',
@@ -178,6 +196,23 @@ function validateSettings(values) {
 
   const smtpPort = Number(values.SMTP_PORT);
   if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) errors.push('SMTP port must be a number from 1 to 65535.');
+  const imapPort = Number(values.IMAP_PORT);
+  if (!Number.isInteger(imapPort) || imapPort < 1 || imapPort > 65535) errors.push('IMAP port must be a number from 1 to 65535.');
+  const followUpDays = Number(values.FOLLOW_UP_DAYS);
+  if (!Number.isInteger(followUpDays) || followUpDays < 1 || followUpDays > 365) errors.push('Follow-up age must be a whole number from 1 to 365 days.');
+  if (!['true', 'false'].includes(values.SCHEDULE_ENABLED)) errors.push('Choose whether scheduled sending is on or off.');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(values.SCHEDULE_TIME)) errors.push('Scheduled send time must be a valid 24-hour time.');
+  const scheduleLimit = Number(values.SCHEDULE_DAILY_LIMIT);
+  if (!Number.isInteger(scheduleLimit) || scheduleLimit < 1 || scheduleLimit > 1000) errors.push('Scheduled daily limit must be a whole number from 1 to 1000.');
+  if (values.SCHEDULE_ENABLED === 'true' && values.DRY_RUN !== 'false') {
+    errors.push('Scheduled sending requires Live mode. Turn scheduling off or switch to Live mode.');
+  }
+  if (values.SCHEDULE_ENABLED === 'true' && (!values.SMTP_USER.trim() || !values.SMTP_PASS.trim())) {
+    errors.push('Scheduled sending requires SMTP username and password.');
+  }
+  if (values.SCHEDULE_ENABLED === 'true' && (!values.CV_PATH.trim() || !fs.existsSync(path.resolve(projectRoot, values.CV_PATH.trim())))) {
+    errors.push('Scheduled sending requires a valid CV file path.');
+  }
   for (const [key, min, max] of [['DAILY_LIMIT', 1, 1000], ['SEARCH_COUNT', 1, 20]]) {
     const value = Number(values[key]);
     if (!Number.isInteger(value) || value < min || value > max) errors.push(`${key} must be a whole number from ${min} to ${max}.`);
@@ -197,6 +232,7 @@ function validateSettings(values) {
   }
   if (!['true', 'false'].includes(values.SEND_LOW_CONFIDENCE)) errors.push('Choose how low-confidence hooks should be handled.');
   if (!values.SMTP_HOST.trim()) errors.push('SMTP host is required.');
+  if (!values.IMAP_HOST.trim()) errors.push('IMAP host is required.');
   if (!values.OPENROUTER_MODEL.trim()) errors.push('OpenRouter model is required.');
   if (values.DRY_RUN === 'false' && (!values.SMTP_USER.trim() || !values.SMTP_PASS.trim())) {
     errors.push('Live sending requires an SMTP username and password.');
@@ -220,7 +256,7 @@ function validateSettings(values) {
   if (!fs.existsSync(promptsPath) || !fs.statSync(promptsPath).isDirectory()) {
     errors.push(`Prompt folder not found: ${values.PROMPTS_DIR}. The prompts directory is required.`);
   } else {
-    for (const name of ['system.txt', 'user.txt', 'no_web.txt', 'search_query.txt', 'email_body.txt', 'email_signature.txt']) {
+    for (const name of ['system.txt', 'user.txt', 'no_web.txt', 'search_query.txt', 'email_body.txt', 'email_signature.txt', 'follow_up.txt']) {
       if (!fs.existsSync(path.join(promptsPath, name))) errors.push(`Prompt file missing: ${path.join(values.PROMPTS_DIR, name)}`);
     }
   }
@@ -271,10 +307,17 @@ function googleSheetCsvUrl(sheetUrl) {
 }
 
 function startJob(action, limit) {
-  const args = action === 'preview' ? ['preview', String(limit)] : ['send'];
+  const command = {
+    preview: ['preview', String(limit)],
+    send: ['send'],
+    'scheduled-send': ['send'],
+    'followups-sync': ['followups-sync'],
+    'followups-send': ['followups-send'],
+  }[action];
   const env = {
     ...process.env,
-    ...(action === 'send' ? { DAILY_LIMIT: String(limit) } : {}),
+    ...(['send', 'scheduled-send'].includes(action) ? { DAILY_LIMIT: String(limit) } : {}),
+    ...(action === 'scheduled-send' ? { SCHEDULED_RUN: 'true' } : {}),
   };
 
   logHistory = [];
@@ -290,11 +333,17 @@ function startJob(action, limit) {
   addLog(
     action === 'preview'
       ? `Starting hook preview for up to ${limit} professors.`
-      : `Starting send cycle with a daily limit of ${limit}. DRY_RUN=${env.DRY_RUN !== 'false'}.`,
+      : action === 'send'
+        ? `Starting send cycle with a daily limit of ${limit}. DRY_RUN=${env.DRY_RUN !== 'false'}.`
+        : action === 'scheduled-send'
+          ? `Scheduled campaign starting with a daily cap of ${limit}.`
+        : action === 'followups-sync'
+          ? 'Checking the inbox for replies to sent outreach.'
+          : `Starting follow-up run. DRY_RUN=${env.DRY_RUN !== 'false'}.`,
     'system',
   );
 
-  child = spawn(process.execPath, [path.join(root, 'index.js'), ...args], {
+  child = spawn(process.execPath, [path.join(root, 'index.js'), ...command], {
     cwd: path.dirname(root),
     env: action === 'status' ? { ...env, STATUS_JSON: '1' } : env,
     windowsHide: true,
@@ -307,7 +356,10 @@ function startJob(action, limit) {
     output.on('data', (chunk) => {
       const lines = (remainder + chunk).split(/\r?\n/);
       remainder = lines.pop() || '';
-      for (const line of lines) addLog(line, stream);
+      for (const line of lines) {
+        addLog(line, stream);
+        if (/bounce|inbox check complete/i.test(line)) notify(/bounce/i.test(line) ? 'warning' : 'info', 'Mailbox update', line);
+      }
     });
     output.on('end', () => {
       if (remainder) addLog(remainder, stream);
@@ -326,12 +378,77 @@ function startJob(action, limit) {
     else addLog(`Mailer ${job?.status || 'finished'}${code === null ? '' : ` (exit ${code})`}.`, 'system');
     child = null;
     sendEvent('job', job);
+    if (job.action === 'scheduled-send') {
+      notify(job.status === 'completed' ? 'success' : 'warning', 'Scheduled campaign update', `Daily campaign ${job.status}.`);
+    } else if (job.action === 'followups-sync') {
+      notify(job.status === 'completed' ? 'success' : 'warning', 'Inbox scan update', `Inbox scan ${job.status}.`);
+    } else if (job.action === 'followups-send') {
+      notify(job.status === 'completed' ? 'success' : 'warning', 'Follow-up update', `Follow-up run ${job.status}.`);
+    } else if (job.action === 'send') {
+      notify(job.status === 'completed' ? 'success' : 'warning', 'Campaign update', `Email run ${job.status}.`);
+    }
   });
 }
 
-async function getStatus() {
+function readScheduleState() {
+  if (!fs.existsSync(statePath)) return { sent: {}, failed: {}, days: {} };
+  return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+}
+
+function saveScheduleState(state) {
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
+function notify(type, title, message) {
+  io?.emit('notification', { type, title, message, at: new Date().toISOString() });
+}
+
+function scheduleStatus() {
+  const values = readSettings();
+  return {
+    enabled: values.SCHEDULE_ENABLED === 'true',
+    time: values.SCHEDULE_TIME,
+    dailyLimit: Number(values.SCHEDULE_DAILY_LIMIT) || 20,
+    live: values.DRY_RUN === 'false',
+    lastRunAt: scheduleState.lastRunAt,
+    lastRunDay: scheduleState.lastRunDay,
+    taskRunning: Boolean(child),
+  };
+}
+
+function checkScheduledSend() {
+  const config = scheduleStatus();
+  const now = localScheduleDate();
+  if (!isScheduleDue(config, scheduleState.lastRunDay)) return;
+  if (child) {
+    if (scheduledBusyNoticeDay !== now.date) {
+      notify('warning', 'Scheduled campaign waiting', 'Another task is still running. The schedule will start once it finishes.');
+      scheduledBusyNoticeDay = now.date;
+    }
+    return;
+  }
+
+  const state = readScheduleState();
+  state.schedule ||= {};
+  state.schedule.lastRunDay = now.date;
+  state.schedule.lastRunAt = new Date().toISOString();
+  saveScheduleState(state);
+  scheduleState = { lastRunDay: now.date, lastRunAt: state.schedule.lastRunAt };
+  notify('info', 'Scheduled campaign starting', `Daily campaign started with a limit of ${config.dailyLimit}.`);
+  startJob('scheduled-send', config.dailyLimit);
+}
+
+function loadScheduleProgress() {
+  const state = readScheduleState();
+  scheduleState = {
+    lastRunDay: state.schedule?.lastRunDay || null,
+    lastRunAt: state.schedule?.lastRunAt || null,
+  };
+}
+
+async function getMailerJson(command) {
   return new Promise((resolve, reject) => {
-    const statusProcess = spawn(process.execPath, [path.join(root, 'index.js'), 'status'], {
+    const statusProcess = spawn(process.execPath, [path.join(root, 'index.js'), command], {
       cwd: path.dirname(root),
       env: { ...process.env, STATUS_JSON: '1' },
       windowsHide: true,
@@ -346,13 +463,13 @@ async function getStatus() {
     statusProcess.on('error', reject);
     statusProcess.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(errorOutput.trim() || `Status command exited with code ${code}.`));
+        reject(new Error(errorOutput.trim() || `${command} exited with code ${code}.`));
         return;
       }
       try {
         resolve(JSON.parse(output));
       } catch {
-        reject(new Error('Could not read the mailer status response.'));
+        reject(new Error(`Could not read the ${command} response.`));
       }
     });
   });
@@ -384,6 +501,80 @@ const server = http.createServer(async (request, response) => {
       'X-Content-Type-Options': 'nosniff',
     });
     fs.createReadStream(path.join(root, 'dashboard.js')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/theme.js') {
+    response.writeHead(200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    fs.createReadStream(path.join(root, 'theme.js')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/app-header.js') {
+    response.writeHead(200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    fs.createReadStream(path.join(root, 'app-header.js')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/followups') {
+    response.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+      'Referrer-Policy': 'no-referrer',
+    });
+    fs.createReadStream(path.join(root, 'followups.html')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/followups.js') {
+    response.writeHead(200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    fs.createReadStream(path.join(root, 'followups.js')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/bounces') {
+    response.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+      'Referrer-Policy': 'no-referrer',
+    });
+    fs.createReadStream(path.join(root, 'bounces.html')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/bounces.js') {
+    response.writeHead(200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    fs.createReadStream(path.join(root, 'bounces.js')).pipe(response);
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/app.css') {
+    response.writeHead(200, {
+      'Content-Type': 'text/css; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    fs.createReadStream(path.join(root, 'app.css')).pipe(response);
     return;
   }
 
@@ -461,6 +652,11 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       persistSettings(values);
+      if (values.SCHEDULE_ENABLED === 'true') {
+        notify('success', 'Schedule saved', `Daily campaign set for ${values.SCHEDULE_TIME}, local time, up to ${values.SCHEDULE_DAILY_LIMIT} emails.`);
+      } else {
+        notify('info', 'Schedule updated', 'Automatic daily sending is disabled.');
+      }
       sendJson(response, 200, {
         saved: true,
         message: Number(values.PORT) === port
@@ -582,15 +778,70 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 200, {
       dryRun: process.env.DRY_RUN !== 'false',
       dailyLimit: Number(process.env.DAILY_LIMIT) || 20,
+      schedule: scheduleStatus(),
     });
     return;
   }
 
   if (request.method === 'GET' && url.pathname === '/api/status') {
     try {
-      sendJson(response, 200, await getStatus());
+      sendJson(response, 200, await getMailerJson('status'));
     } catch (error) {
       sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/followups') {
+    try {
+      sendJson(response, 200, await getMailerJson('followups-status'));
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/bounces') {
+    try {
+      sendJson(response, 200, await getMailerJson('followups-status'));
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/contact-outcome') {
+    if (child) {
+      sendJson(response, 409, { error: 'Stop the running task before changing contact outcomes.' });
+      return;
+    }
+    try {
+      const body = await readBody(request);
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      const outcome = body.outcome;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        sendJson(response, 400, { error: 'Enter a valid contact email.' });
+        return;
+      }
+      if (!['active', 'interested', 'not_interested', 'do_not_contact'].includes(outcome)) {
+        sendJson(response, 400, { error: 'Choose a valid contact outcome.' });
+        return;
+      }
+
+      const statePath = path.join(projectRoot, 'state.json');
+      const state = fs.existsSync(statePath)
+        ? JSON.parse(fs.readFileSync(statePath, 'utf8'))
+        : { sent: {}, failed: {}, days: {} };
+      state.contacts ||= {};
+      if (outcome === 'active') {
+        delete state.contacts[email];
+      } else {
+        state.contacts[email] = { status: outcome, updatedAt: new Date().toISOString() };
+      }
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+      sendJson(response, 200, { saved: true, email, outcome });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof SyntaxError ? 'Saved contact history is not valid JSON.' : error.message });
     }
     return;
   }
@@ -616,14 +867,12 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = await readBody(request);
       const { action, limit } = body;
-      if (!['preview', 'send'].includes(action)) {
-        sendJson(response, 400, { error: 'Choose preview or send.' });
+      if (!['preview', 'send', 'followups-sync', 'followups-send'].includes(action)) {
+        sendJson(response, 400, { error: 'Choose preview, send, inbox check, or follow-up send.' });
         return;
       }
-      const min = action === 'preview' ? 1 : 1;
-      const max = action === 'preview' ? 100 : 100;
-      if (!Number.isInteger(limit) || limit < min || limit > max) {
-        sendJson(response, 400, { error: `Limit must be a whole number from ${min} to ${max}.` });
+      if (['preview', 'send'].includes(action) && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+        sendJson(response, 400, { error: 'Limit must be a whole number from 1 to 100.' });
         return;
       }
       startJob(action, limit);
@@ -649,6 +898,19 @@ const server = http.createServer(async (request, response) => {
 
   sendJson(response, 404, { error: 'Not found.' });
 });
+
+io = new SocketServer(server, {
+  serveClient: true,
+  maxHttpBufferSize: 10_000,
+});
+
+io.on('connection', (socket) => {
+  socket.emit('snapshot', { job, logs: logHistory, schedule: scheduleStatus() });
+});
+
+loadScheduleProgress();
+scheduleTimer = setInterval(checkScheduledSend, 30_000);
+checkScheduledSend();
 
 server.listen(port, host, () => {
   console.log(`CSC Mailer dashboard: http://${host}:${port}`);

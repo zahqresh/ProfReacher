@@ -36,7 +36,7 @@
       .eyebrow { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
       h1 { margin: 0; font-size: clamp(36px, 5vw, 54px); line-height: 1.05; letter-spacing: -.055em; font-weight: 680; }
       .subtitle { margin: 14px 0 0; color: #6e6e73; font-size: 16px; line-height: 1.55; }
-      .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0 18px; }
+      .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 28px 0 18px; }
       .card, .panel { border: 1px solid #e9e9eb; border-radius: 18px; background: #fff; box-shadow: 0 2px 8px #00000005; }
       .card { padding: 19px 20px; }
       .card-label { color: var(--muted); font-size: 12px; }
@@ -98,16 +98,12 @@
         .log-box { height: 300px; }
       }
     </style>
+    <link rel="stylesheet" href="/app.css">
   </head>
-  <body>
+  <body class="app-shell">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
     <main class="page">
-      <header class="topbar">
-        <div class="brand"><span class="brand-mark">C</span> CSC Mailer</div>
-        <div style="display:flex;align-items:center;gap:18px">
-          <a class="nav-link" href="/settings">Settings</a>
-          <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Connecting</span></div>
-        </div>
-      </header>
+      <header class="topbar" id="app-header"></header>
 
       <section class="intro">
         <p class="eyebrow">Outreach workspace</p>
@@ -120,6 +116,7 @@
         <article class="card"><div class="card-label">Pending</div><div class="card-value" id="pending">—</div></article>
         <article class="card"><div class="card-label">Hooks ready</div><div class="card-value" id="hooks-ready">—</div></article>
         <article class="card"><div class="card-label">Sent today</div><div class="card-value" id="sent-today">—</div></article>
+        <article class="card"><div class="card-label">Suppressed</div><div class="card-value" id="suppressed">—</div></article>
       </section>
 
       <section class="workspace">
@@ -166,6 +163,9 @@
 
       <aside class="notice"><span class="notice-icon">i</span><span>Review generated hooks before sending. In live mode, emails are sent through your configured SMTP account with the daily cap and randomized delays from .env. Stop leaves saved progress available for a later run.</span></aside>
     </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app-header.js" defer></script>
+    <script src="/theme.js" defer></script>
     <script src="/dashboard.js" defer></script>
   </body>
 </html>

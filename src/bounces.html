@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b0c10">
+    <title>Bounce monitor · CSC Mailer</title>
+    <style>
+      .bounce-rate { color: var(--app-red); }
+      .status-line { min-height: 24px; margin-top: 12px; color: var(--app-muted); font-size: 12px; }
+      .reason { max-width: 560px; white-space: normal; overflow-wrap: anywhere; }
+      @media (max-width: 700px) { .app-shell .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    </style>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body class="app-shell">
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+    <main class="page">
+      <header class="topbar" id="app-header"></header>
+      <p class="eyebrow">Delivery health</p>
+      <h1>Keep your list healthy.</h1>
+      <p class="subtitle">Scan delivery failure notices in your mailbox. Confirmed bounces are automatically excluded from future outreach. Detection uses the configured IMAP inbox, not Gmail API.</p>
+
+      <section class="cards" aria-label="Delivery statistics">
+        <article class="card"><div class="card-label">Original emails sent</div><div class="card-value" id="sent-count">—</div></article>
+        <article class="card"><div class="card-label">Bounces detected</div><div class="card-value bounce-rate" id="bounce-count">—</div></article>
+        <article class="card"><div class="card-label">No bounce notice found</div><div class="card-value" id="delivery-rate">—</div></article>
+        <article class="card"><div class="card-label">Excluded addresses</div><div class="card-value" id="excluded-count">—</div></article>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div><h2>Bounce monitor</h2><p class="description" id="scan-info">Inbox scan has not run yet.</p></div>
+          <button class="button primary" id="scan-button">Scan inbox</button>
+        </div>
+        <p class="status-line" id="scan-status" role="status"></p>
+        <div style="overflow:auto" id="bounce-table"></div>
+      </section>
+      <aside class="notice"><span class="notice-icon">i</span><span>Bounce detection relies on standard delivery-failure sender/subject patterns and the failed recipient listed in the report. Review the result before updating your source list. Bounced addresses are automatically suppressed from future sends.</span></aside>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app-header.js" defer></script>
+    <script src="/theme.js" defer></script>
+    <script src="/bounces.js" defer></script>
+  </body>
+</html>

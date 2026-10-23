@@ -5,6 +5,7 @@ import { parse } from 'csv-parse/sync';
 import nodemailer from 'nodemailer';
 import { searchOpenAlexProfessor } from './openalex.js';
 import { createOpenRouterClient } from './openrouter.js';
+import { getDueFollowUps, isContactSuppressed, normalizeEmailMap, syncReplies } from './reply-tracking.js';
 
 const env = process.env;
 const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ? Number(v) : d);
@@ -18,6 +19,11 @@ const cfg = {
   smtpPort: num(env.SMTP_PORT, 465),
   user: env.SMTP_USER || '',
   pass: env.SMTP_PASS || '',
+  imapHost: env.IMAP_HOST || 'imap.gmail.com',
+  imapPort: num(env.IMAP_PORT, 993),
+  imapUser: env.IMAP_USER || env.SMTP_USER || '',
+  imapPass: env.IMAP_PASS || env.SMTP_PASS || '',
+  followUpDays: num(env.FOLLOW_UP_DAYS, 7),
   fromName: env.FROM_NAME || 'Muhammad Hamza',
   subject: env.SUBJECT || 'CSC 2027 PhD Application Enquiry - Muhammad Hamza',
   apiKey: env.OPENROUTER_API_KEY || '',
@@ -221,9 +227,9 @@ async function sendMail(r, h) {
   if (cfg.dryRun) {
     fs.mkdirSync('outbox', { recursive: true });
     fs.writeFileSync(path.join('outbox', `${r.email.replace(/[^a-z0-9@.]/gi, '_')}.txt`), `To: ${r.email}\nSubject: ${cfg.subject}\n\n${text}\n`);
-    return;
+    return null;
   }
-  await getTransporter().sendMail({
+  return getTransporter().sendMail({
     from: `"${cfg.fromName}" <${cfg.user}>`,
     to: r.email,
     subject: cfg.subject,
@@ -255,7 +261,22 @@ function gate(h) {
 async function getPending() {
   const rows = loadRows(await loadCsvText());
   const state = readJson(STATE_FILE, { sent: {}, failed: {}, days: {} });
-  return { rows, state, pending: rows.filter((r) => !state.sent[r.email]) };
+  state.sent = normalizeEmailMap(state.sent);
+  state.failed = normalizeEmailMap(state.failed);
+  state.replies = normalizeEmailMap(state.replies);
+  state.followUps = normalizeEmailMap(state.followUps);
+  state.contacts = normalizeEmailMap(state.contacts);
+  state.bounces = normalizeEmailMap(state.bounces);
+  state.days ||= {};
+  const suppressed = rows.filter((r) => isContactSuppressed(state.contacts[r.email]?.status) || state.bounces[r.email]).length;
+  return {
+    rows,
+    state,
+    suppressed,
+    pending: rows.filter((r) => !state.sent[r.email]
+      && !isContactSuppressed(state.contacts[r.email]?.status)
+      && !state.bounces[r.email]),
+  };
 }
 
 async function preview(n) {
@@ -290,6 +311,10 @@ async function send() {
 
   for (const r of pending) {
     // daily quota
+    if (!cfg.dryRun && (state.days[dayKey()] || 0) >= cfg.dailyLimit && env.SCHEDULED_RUN === 'true') {
+      log('Scheduled daily limit reached; stopping this run.');
+      break;
+    }
     while (!cfg.dryRun && (state.days[dayKey()] || 0) >= cfg.dailyLimit) {
       const ms = msUntilNextStart();
       log(`Daily limit reached. Sleeping ${(ms / 3600000).toFixed(1)}h until 5:00 AM PKT.`);
@@ -318,7 +343,7 @@ async function send() {
     }
 
     try {
-      await sendMail(r, h);
+      const messageInfo = await sendMail(r, h);
     } catch (e) {
       if (e.responseCode === 535 || e.code === 'EAUTH') throw new Error(`SMTP login failed: ${e.message}`);
       log(`${r.name} <${r.email}>: send failed - ${e.message}`);
@@ -329,7 +354,12 @@ async function send() {
 
     dryCount++;
     if (!cfg.dryRun) {
-      state.sent[r.email] = { at: new Date().toISOString(), name: r.name };
+      state.sent[r.email] = {
+        at: new Date().toISOString(),
+        name: r.name,
+        subject: cfg.subject,
+        messageId: messageInfo?.messageId,
+      };
       state.days[dayKey()] = (state.days[dayKey()] || 0) + 1;
       delete state.failed[r.email];
       writeJson(STATE_FILE, state);
@@ -346,13 +376,159 @@ async function send() {
   log('Done.');
 }
 
+async function followUpStatus() {
+  const { rows, state } = await getPending();
+  state.replies ||= {};
+  state.followUps ||= {};
+  state.bounces ||= {};
+  state.contacts ||= {};
+  const due = getDueFollowUps(rows, state, cfg.followUpDays);
+  const rowsByEmail = new Map(rows.map((row) => [row.email.toLowerCase(), row]));
+  const detectedReplies = Object.entries(state.replies)
+    .filter(([email]) => state.sent[email])
+    .map(([email, reply]) => ({
+      name: rowsByEmail.get(email.toLowerCase())?.name || state.sent[email].name || email,
+      email,
+      university: rowsByEmail.get(email.toLowerCase())?.university || '',
+      sentAt: state.sent[email].at,
+      repliedAt: reply.at,
+      subject: reply.subject,
+      outcome: state.contacts[email]?.status || 'active',
+    }));
+  const recordedOutcomes = Object.entries(state.contacts)
+    .filter(([, contact]) => contact.status && contact.status !== 'active')
+    .map(([email, contact]) => ({
+      name: rowsByEmail.get(email.toLowerCase())?.name || state.sent[email]?.name || email,
+      email,
+      university: rowsByEmail.get(email.toLowerCase())?.university || '',
+      outcome: contact.status,
+      updatedAt: contact.updatedAt,
+    }));
+  const result = {
+    sent: Object.keys(state.sent).length,
+    replied: Object.keys(state.replies).filter((email) => state.sent[email]).length,
+    due: due.length,
+    followUpsSent: Object.values(state.followUps).filter((entry) => entry.sentAt).length,
+    outcomes: Object.values(state.contacts).filter((contact) => contact.status && contact.status !== 'active').length,
+    bounces: Object.entries(state.bounces).map(([email, bounce]) => ({
+      email,
+      name: rowsByEmail.get(email.toLowerCase())?.name || state.sent[email]?.name || email,
+      university: rowsByEmail.get(email.toLowerCase())?.university || '',
+      sentAt: state.sent[email]?.at,
+      bouncedAt: bounce.at,
+      subject: bounce.subject,
+      reason: bounce.reason,
+      messageId: bounce.messageId,
+    })),
+    recordedOutcomes,
+    followUpDays: cfg.followUpDays,
+    dryRun: cfg.dryRun,
+    inboxChecked: Boolean(state.mailboxLastCheckedAt),
+    dailyLimit: cfg.dailyLimit,
+    sentToday: state.days[dayKey()] || 0,
+    remainingToday: Math.max(0, cfg.dailyLimit - (state.days[dayKey()] || 0)),
+    lastInboxCheck: state.mailboxLastCheckedAt || null,
+    candidates: due,
+    detectedReplies,
+  };
+  console.log(JSON.stringify(result));
+}
+
+async function checkInbox(state) {
+  state.replies ||= {};
+  state.followUps ||= {};
+  for (const record of Object.values(state.sent)) {
+    record.subject ||= cfg.subject;
+  }
+  return syncReplies(state, {
+    host: cfg.imapHost,
+    port: cfg.imapPort,
+    user: cfg.imapUser,
+    pass: cfg.imapPass,
+  });
+}
+
+async function syncFollowUps() {
+  const { state } = await getPending();
+  const detected = await checkInbox(state);
+  writeJson(STATE_FILE, state);
+  log(`Inbox check complete: ${detected.repliesDetected} new ${detected.repliesDetected === 1 ? 'reply' : 'replies'}, ${detected.bouncesDetected} new ${detected.bouncesDetected === 1 ? 'bounce' : 'bounces'}.`);
+}
+
+async function sendFollowUps() {
+  if (!cfg.dryRun && (!cfg.user || !cfg.pass)) throw new Error('SMTP_USER / SMTP_PASS missing');
+  const { rows, state } = await getPending();
+  state.followUps ||= {};
+  log('Checking the inbox before preparing follow-ups.');
+  const detected = await checkInbox(state);
+  writeJson(STATE_FILE, state);
+  log(`Inbox check complete: ${detected.repliesDetected} new ${detected.repliesDetected === 1 ? 'reply' : 'replies'}, ${detected.bouncesDetected} new ${detected.bouncesDetected === 1 ? 'bounce' : 'bounces'}.`);
+  const due = getDueFollowUps(rows, state, cfg.followUpDays);
+  const alreadySentToday = state.days[dayKey()] || 0;
+  const available = Math.max(0, cfg.dailyLimit - alreadySentToday);
+  const batch = due.slice(0, available);
+  log(`${due.length} follow-up${due.length === 1 ? '' : 's'} eligible; sending or drafting up to ${batch.length} (limit ${cfg.dailyLimit}/day).`);
+
+  let completed = 0;
+  for (const r of batch) {
+    const sent = state.sent[r.email];
+    const subject = `Re: ${sent.subject || cfg.subject}`;
+    const text = fill(loadPrompt('follow_up.txt'), {
+      name: r.name,
+      university: r.university || 'your university',
+      sentDate: new Date(sent.at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      fromName: cfg.fromName,
+    });
+
+    try {
+      if (cfg.dryRun) {
+        fs.mkdirSync('outbox', { recursive: true });
+        const file = `follow-up-${r.email.replace(/[^a-z0-9@.]/gi, '_')}.txt`;
+        fs.writeFileSync(path.join('outbox', file), `To: ${r.email}\nSubject: ${subject}\n\n${text}\n`);
+        state.followUps[r.email] = { ...state.followUps[r.email], draftAt: new Date().toISOString(), subject };
+        log(`${r.name}: follow-up draft saved to outbox/${file}`);
+      } else {
+        const originalMessageId = state.followUps[r.email]?.messageId || sent.messageId;
+        const info = await getTransporter().sendMail({
+          from: `"${cfg.fromName}" <${cfg.user}>`,
+          to: r.email,
+          subject,
+          text,
+          ...(originalMessageId ? {
+            inReplyTo: originalMessageId,
+            references: [originalMessageId],
+          } : {}),
+        });
+        state.followUps[r.email] = {
+          sentAt: new Date().toISOString(),
+          subject,
+          messageId: info.messageId,
+        };
+        state.days[dayKey()] = (state.days[dayKey()] || 0) + 1;
+        fs.appendFileSync(LOG_FILE, `"${r.name}","${r.university}",${r.email},${new Date().toISOString()},follow-up\n`);
+        log(`${r.name}: follow-up sent to ${r.email}`);
+      }
+      writeJson(STATE_FILE, state);
+      completed += 1;
+    } catch (e) {
+      if (e.responseCode === 535 || e.code === 'EAUTH') throw new Error(`SMTP login failed: ${e.message}`);
+      log(`${r.name}: follow-up failed - ${e.message}`);
+    }
+
+    if (completed < batch.length) await sleep(cfg.dryRun ? 500 : randomDelayMs());
+  }
+  if (due.length > batch.length) log(`Daily limit leaves ${due.length - batch.length} eligible follow-up(s) for a later run.`);
+  log('Follow-up run complete.');
+}
+
 async function status() {
-  const { rows, state, pending } = await getPending();
+  const { rows, state, pending, suppressed } = await getPending();
   const hooks = readJson(HOOKS_FILE, {});
   const result = {
     eligibleRows: rows.length,
     sent: Object.keys(state.sent).length,
     pending: pending.length,
+    suppressed,
     hooksReady: pending.filter((r) => hooks[r.email]).length,
     sentToday: state.days[dayKey()] || 0,
     failed: Object.keys(state.failed).length,
@@ -361,9 +537,16 @@ async function status() {
 }
 
 const [cmd = 'send', arg] = process.argv.slice(2);
-const run = { preview: () => preview(num(arg, 20)), send, status }[cmd];
+const run = {
+  preview: () => preview(num(arg, 20)),
+  send,
+  status,
+  'followups-status': followUpStatus,
+  'followups-sync': syncFollowUps,
+  'followups-send': sendFollowUps,
+}[cmd];
 if (!run) {
-  console.log('Usage: node src/index.js [preview [n] | send | status]');
+  console.log('Usage: node src/index.js [preview [n] | send | status | followups-status | followups-sync | followups-send]');
   process.exit(1);
 }
 run().catch((e) => {

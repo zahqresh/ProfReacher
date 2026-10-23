@@ -89,6 +89,10 @@ async function loadConfig() {
   if (!config.dryRun) {
     $('#task-hint').textContent = 'Live mode is enabled in .env. Starting sends will deliver real emails; you will be asked to confirm.';
   }
+  const schedule = config.schedule;
+  if (schedule.enabled) {
+    $('#task-hint').textContent = `Automatic daily send is enabled for ${schedule.time} local time, up to ${schedule.dailyLimit} emails. Keep this dashboard running.`;
+  }
   configReady = true;
   setActive(active);
 }
@@ -102,6 +106,7 @@ async function refreshStatus() {
     $('#pending').textContent = status.pending;
     $('#hooks-ready').textContent = status.hooksReady;
     $('#sent-today').textContent = status.sentToday;
+    $('#suppressed').textContent = status.suppressed || 0;
   } catch (error) {
     showError(error.message);
   }
@@ -152,36 +157,27 @@ stopButton.addEventListener('click', async () => {
 });
 $('#clear-button').addEventListener('click', () => { logs.length = 0; renderLogs(); });
 
-const events = new EventSource('/api/events');
-events.addEventListener('open', () => {
-  $('#connection-dot').classList.add('online');
-  $('#connection-label').textContent = 'Local dashboard';
-});
-events.addEventListener('error', () => {
-  $('#connection-dot').classList.remove('online');
-  $('#connection-label').textContent = 'Reconnecting';
-});
-events.addEventListener('snapshot', (event) => {
-  const snapshot = JSON.parse(event.data);
+const socket = window.appSocket;
+socket.on('snapshot', (snapshot) => {
   currentJob = snapshot.job;
   logs.splice(0, logs.length, ...(snapshot.logs || []));
   setActive(Boolean(currentJob?.status === 'running' || currentJob?.status === 'stopping'));
   if (currentJob && !active) $('#activity-status').textContent = currentJob.status;
   renderLogs();
 });
-events.addEventListener('log', (event) => {
-  const entry = JSON.parse(event.data);
+socket.on('log', (entry) => {
   appendLog(entry);
   updateProgress(entry);
 });
-events.addEventListener('job', (event) => {
-  currentJob = JSON.parse(event.data);
+socket.on('job', (updatedJob) => {
+  currentJob = updatedJob;
   setActive(currentJob.status === 'running' || currentJob.status === 'stopping');
   if (!active) {
     $('#activity-status').textContent = currentJob.status;
     refreshStatus();
   }
 });
+socket.on('notification', (notification) => window.showToast(notification));
 
 loadConfig().catch((error) => showError(error.message));
 refreshStatus();

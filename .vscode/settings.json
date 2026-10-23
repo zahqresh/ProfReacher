@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^npm audit --omit=dev$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

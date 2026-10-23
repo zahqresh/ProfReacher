@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const form = $('#settings-form');
 const banner = $('#banner');
-const secretKeys = ['OPENROUTER_API_KEY', 'LANGSEARCH_API_KEY', 'OPENALEX_API_KEY', 'SMTP_PASS'];
+const secretKeys = ['OPENROUTER_API_KEY', 'LANGSEARCH_API_KEY', 'OPENALEX_API_KEY', 'SMTP_PASS', 'IMAP_PASS'];
 
 function showBanner(message, isError = false) {
   banner.textContent = message;
@@ -169,6 +169,11 @@ $('#upload-csv').addEventListener('click', uploadCsv);
 $('#upload-cv').addEventListener('click', uploadCv);
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const payload = makeSettingsPayload();
+  if (payload.SCHEDULE_ENABLED === 'true' && payload.DRY_RUN === 'false'
+    && !window.confirm(`Enable automatic LIVE email sending every day at ${payload.SCHEDULE_TIME || 'the selected time'}, up to ${payload.SCHEDULE_DAILY_LIMIT} emails per day? The dashboard must remain open and this cannot be canceled once messages are in progress.`)) {
+    return;
+  }
   const saveButton = $('#save-button');
   saveButton.disabled = true;
   saveButton.textContent = 'Saving…';
@@ -176,7 +181,7 @@ form.addEventListener('submit', async (event) => {
     const result = await requestJson('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeSettingsPayload()),
+      body: JSON.stringify(payload),
     });
     for (const key of secretKeys) {
       $(`#${key}-status`).textContent = result.secrets[key] ? 'Saved' : 'Not set';
@@ -184,6 +189,13 @@ form.addEventListener('submit', async (event) => {
       form.elements[`clear_${key}`].checked = false;
     }
     showBanner(result.message);
+    window.showToast({
+      type: 'success',
+      title: 'Settings saved',
+      message: payload.SCHEDULE_ENABLED === 'true'
+        ? `Daily campaign is enabled for ${payload.SCHEDULE_TIME} local time.`
+        : 'Your configuration was updated.',
+    });
   } catch (error) {
     showBanner(error.message, true);
   } finally {
@@ -192,4 +204,6 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
+const socket = window.appSocket;
+socket.on('notification', (notification) => window.showToast(notification));
 loadSettings().catch((error) => showBanner(error.message, true));
