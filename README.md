@@ -2,7 +2,7 @@
 
 A local-first Node.js dashboard for managing personalized professor outreach for a CSC PhD application campaign. Prepare and review professor-specific hooks, send through your SMTP account, track replies over IMAP, manage follow-ups, monitor likely bounces, and optionally schedule a daily campaign.
 
-![CSC Mailer dashboard](./screenshots/dashboard.png)
+![ProfReacher dashboard](./screenshots/dashboard.png)
 
 *Dashboard preview in safe mode. Counts and activity depend on your local campaign data.*
 
@@ -364,4 +364,24 @@ This makes the tool safe to interrupt and resume.
 
 ## License
 
-No `LICENSE` file is currently included. Before redistributing this project as open source, the repository owner should choose and add a license. Until then, reuse and redistribution permissions are not granted by this README.
+MIT License
+
+Copyright (c) 2025 zahqresh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
